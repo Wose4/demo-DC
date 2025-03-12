@@ -30,54 +30,37 @@ st.image("winch4ai.png", width=500)
 
 st.header("Application Démo / Mise en forme de Dossiers de compétences", divider="blue")
 
-## ------------ GEMINI's configuration ----------
+## ------------ AI's configuration ----------
 
-# Initialize the Vertex AI API with the project and location
-PROJECT_ID = os.environ.get("GCP_PROJECT")
-LOCATION = os.environ.get("GCP_REGION")
-
-# Instructions fournies au modèle
-
-# Configurations pour la génération de texte
-generation_config = {
-    "max_output_tokens": 8192,
-    "temperature": 1,
-    "top_p": 0.95,
-}
-
-# Paramètres de sécurité
-safety_settings = [
-    SafetySetting(
-        category=SafetySetting.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-        threshold=SafetySetting.HarmBlockThreshold.OFF
-    ),
-    SafetySetting(
-        category=SafetySetting.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-        threshold=SafetySetting.HarmBlockThreshold.OFF
-    ),
-    SafetySetting(
-        category=SafetySetting.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-        threshold=SafetySetting.HarmBlockThreshold.OFF
-    ),
-    SafetySetting(
-        category=SafetySetting.HarmCategory.HARM_CATEGORY_HARASSMENT,
-        threshold=SafetySetting.HarmBlockThreshold.OFF
-    ),
-]
+client = OpenAI()
 
 ## ------------ Fonction de lancement ----------
 
 def generate(texte, fichiers):
-    vertexai.init(project="new-e-437313", location="europe-west9")
-    model = GenerativeModel(
-        "gemini-1.5-pro-002",
-    )
     
-    responses = model.generate_content(
-        [fichiers, texte],
-        generation_config=generation_config,
-        safety_settings=safety_settings,
-        stream=True,
+    for fichier in fichiers:
+        client.files.create(
+            file=open(fichier, "rb"),
+            purpose="user_data"
+        )
+
+    response = client.responses.create(
+        model="gpt-4o",
+        input=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_file",
+                        "file_id": fichiers,
+                    },
+                    {
+                        "type": "input_text",
+                        "text": texte,
+                    },
+                ]
+            }
+        ]
     )
     
     models_answer=""
