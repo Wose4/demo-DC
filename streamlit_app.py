@@ -7,10 +7,9 @@ This module demonstrates the usage of the Vertex AI Gemini 1.5 API within a Stre
 import os
 from openai import OpenAI
 import streamlit as st
-import vertexai
 import base64
-import fitz
-from vertexai.generative_models import GenerativeModel, Part, SafetySetting
+from openai.api.models import Part
+from dotenv import load_dotenv
 
 import fitz  # import PyMuPDF
 import textwrap
@@ -32,17 +31,19 @@ st.header("Application Démo / Mise en forme de Dossiers de compétences", divid
 
 ## ------------ AI's configuration ----------
 
+load_dotenv()
 client = OpenAI()
+openai_api_key = os.getenv("OPENAI_API_KEY")
+client.api_key = openai_api_key
 
 ## ------------ Fonction de lancement ----------
 
-def generate(texte, fichiers):
+def generate(texte, fichier):
     
-    for fichier in fichiers:
-        client.files.create(
-            file=open(fichier, "rb"),
-            purpose="user_data"
-        )
+    client.files.create(
+        file=open(fichier, "rb"),
+        purpose="user_data"
+    )
 
     response = client.responses.create(
         model="gpt-4o",
@@ -52,7 +53,7 @@ def generate(texte, fichiers):
                 "content": [
                     {
                         "type": "input_file",
-                        "file_id": fichiers,
+                        "file_id": file.id,
                     },
                     {
                         "type": "input_text",
@@ -62,11 +63,8 @@ def generate(texte, fichiers):
             }
         ]
     )
-    
-    models_answer=""
-    for response in responses:
-        models_answer += response.text
-    return models_answer
+
+    return response.content
 
 def gen_pdf(notes_entretien, fichiers):
 
