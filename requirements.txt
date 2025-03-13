@@ -4,5 +4,4 @@ google-cloud-logging
 pymupdf
 anyascii
 openai
-openai.api.models
-dotenv
+python-dotenv

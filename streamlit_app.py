@@ -1,4 +1,3 @@
-
 # pylint: disable=line-too-long,invalid-name
 """
 This module demonstrates the usage of the Vertex AI Gemini 1.5 API within a Streamlit application.
@@ -8,8 +7,8 @@ import os
 from openai import OpenAI
 import streamlit as st
 import base64
-from openai.api.models import Part
 from dotenv import load_dotenv
+from tempfile import NamedTemporaryFile
 
 import fitz  # import PyMuPDF
 import textwrap
@@ -38,33 +37,60 @@ client.api_key = openai_api_key
 
 ## ------------ Fonction de lancement ----------
 
-def generate(texte, fichier):
+def generate(texte, fichier=None):
     
-    client.files.create(
-        file=open(fichier, "rb"),
-        purpose="user_data"
-    )
+    # Structure d'entrée pour l'API
+    input_content = [
+        {
+            "type": "input_text",
+            "text": texte,
+        }
+    ]
+
+    # Si un fichier UploadedFile est fourni
+    if fichier is not None:
+        # 1. Créer un fichier temporaire
+        with NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp.write(fichier.read())     # on écrit le contenu binaire
+            tmp_path = tmp.name          # récupère le chemin du fichier
+        
+        # 2. Appel à l’API en utilisant le chemin du fichier temporaire
+        uploaded_file = client.files.create(
+            file=open(tmp_path, "rb"),
+            purpose="user_data"
+        )
+
+        # 3. Au besoin, insérer le bloc input_file dans input_content
+        input_content.insert(0, {
+            "type": "input_file",
+            "file_id": uploaded_file.id,
+        })
+        
+        # On peut supprimer le fichier temporaire après usage :
+        os.remove(tmp_path)
+    
+    # Si un fichier est fourni, on l'upload et on l'ajoute aux entrées
+    #if fichier is not None:
+    #    uploaded_file = client.files.create(
+    #        file=open(fichier, "rb"),
+    #        purpose="user_data"
+    #    )
+    #    input_content.insert(0, {
+    #        "type": "input_file",
+    #        "file_id": uploaded_file.id,
+    #    })
 
     response = client.responses.create(
         model="gpt-4o",
         input=[
             {
                 "role": "user",
-                "content": [
-                    {
-                        "type": "input_file",
-                        "file_id": file.id,
-                    },
-                    {
-                        "type": "input_text",
-                        "text": texte,
-                    },
-                ]
+                "content": input_content
             }
         ]
     )
-
-    return response.content
+    print(response)
+    return response.output_text
 
 def gen_pdf(notes_entretien, fichiers):
 
@@ -188,7 +214,7 @@ FIN LISTE A REMPLACER
 
                 idx_n_caracter = old_txt.find("c") # Find the index of "c"
                 n_caracter = old_txt[old_txt.rfind('_')+1:idx_n_caracter] # Extract the part before "c" and after the last underscore
-                page.insert_text((rect.x0, 3+(rect.y0+rect.y1)/2), textwrap.wrap(anyascii(new_txt), int(n_caracter) if n_caracter.isdigit() else 64), fontname="F5", fontsize=12, color=(0, 0, 0))
+                page.insert_text((rect.x0, 3+(rect.y0+rect.y1)/2), textwrap.wrap(anyascii(new_txt), int(n_caracter) if n_caracter.isdigit() else 64), fontname="helv", fontsize=12, color=(0, 0, 0))
 
     #page.apply_annots(images=fitz.PDF_REDACT_IMAGE_NONE)  # don't touch images
     doc.save("replaced.pdf")#, garbage=3, deflate=True)
@@ -205,17 +231,17 @@ uploaded_file = st.file_uploader(
 document1=None
 
 # Étape 2 : Si un fichier est uploadé
-if uploaded_file is not None:
+#if uploaded_file is not None:
     # Lecture du contenu du fichier
-    file_content = uploaded_file.read()
+    #file_content = uploaded_file.read()
 
     # Étape 3 : Création d'une partie du document à partir des données base64
-    document1 = Part.from_data(
-        mime_type=uploaded_file.type,  # Récupération du type MIME du fichier
-        data=file_content,  # Utilisation du contenu brut du fichier
-    )
+    #document1 = Part.from_data(
+    #    mime_type=uploaded_file.type,  # Récupération du type MIME du fichier
+    #    data=file_content,  # Utilisation du contenu brut du fichier
+    #)
 
-    st.write("Document uploaded successfully!")
+    #st.write("Document uploaded successfully!")
 
 #for uploaded_file in uploaded_files:
 #    bytes_data = uploaded_file.read()
@@ -239,7 +265,7 @@ st.markdown(
 )
 
 if st.button('Générer le dossier de compétences'):
-    gen_pdf(notes_entretien, fichiers)
+    gen_pdf(notes_entretien, uploaded_file)
 
     with open("replaced.pdf", "rb") as out_pdf_f:
         st.download_button(label="Télécharger le dossier de compétences", data=out_pdf_f, file_name=f"New-E-DC-prenom.pdf", icon="📩")
